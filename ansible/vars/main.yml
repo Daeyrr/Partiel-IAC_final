@@ -1,0 +1,5 @@
+---
+app_user: appuser
+app_dir: /opt/myapp
+virtualenv_dir: /opt/myapp/venv
+app_repo: https://gist.github.com/thibaultserti/21456f4797100376f67443920e5d5145/archive/main.zip

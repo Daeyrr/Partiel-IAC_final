@@ -1,0 +1,85 @@
+---
+- name: Mettre en place l'appli de Tibo
+  hosts: all
+  become: yes
+
+  tasks:
+    - name: S'assurer que python3 est installé
+      apt:
+        name: python3
+        state: present
+        update_cache: yes
+
+    - name: S'assurer que python3-pip est installé
+      apt:
+        name: python3-pip
+        state: present
+
+    - name: S'assurer que virtualenv soit installé
+      pip:
+        name: virtualenv
+        executable: pip3
+
+    - name: Créer le répertoire de l'appli
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0755'
+
+    - name: Créer un user pour l'appli
+      user:
+        name: "{{ app_user }}"
+        home: "{{ app_dir }}"
+        shell: /bin/bash
+        create_home: no
+
+    - name: Télécharger le code de l'appli
+      get_url:
+        url: "{{ app_repo }}"
+        dest: /tmp/app.zip
+
+    - name: Unzip le code de mon appli
+      unarchive:
+        src: /tmp/app.zip
+        dest: "{{ app_dir }}"
+        remote_src: yes
+        extra_opts: [--strip-components=1]
+
+    - name: Créer un environnement virtuel
+      command: virtualenv {{ virtualenv_dir }}
+      args:
+        creates: "{{ virtualenv_dir }}"
+
+    - name: Installer les dépendences
+      pip:
+        requirements: "{{ app_dir }}/requirements.txt"
+        virtualenv: "{{ virtualenv_dir }}"
+
+    - name: Créer systemd service file
+      copy:
+        dest: /etc/systemd/system/myapp.service
+        content: |
+          [Unit]
+          Description=My App Service
+          After=network.target
+
+          [Service]
+          User={{ app_user }}
+          Group={{ app_user }}
+          WorkingDirectory={{ app_dir }}
+          ExecStart={{ virtualenv_dir }}/bin/python3 {{ app_dir }}/app.py
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+
+    - name: Reload systemd daemon
+      command: systemctl daemon-reload
+
+    - name: Enable et start l'application service
+      systemd:
+        name: myapp
+        enabled: yes
+        state: started
